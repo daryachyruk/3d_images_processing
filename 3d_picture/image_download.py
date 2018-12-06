@@ -3,6 +3,8 @@
 import cv2
 import argparse
 import numpy as np
+from skimage import color
+
 
 
 def callback(value):
@@ -27,8 +29,8 @@ def get_arguments():
                     help='Use webcam', action='store_true')
     args = vars(ap.parse_args())
 
-    if not args['filter'].upper() in ['RGB', 'HSV']:
-        ap.error("Please speciy a correct filter.")
+    if not args['filter'].upper() in ['RGB', 'HSV', 'LAB']:
+        ap.error("Please specify a correct filter.")
 
     return args
 
@@ -58,14 +60,16 @@ def main():
 
             if not ret:
                 break
-
+#choose type of colors
             if range_filter == 'RGB':
                 frame_to_thresh = image.copy()
-            else:
+            elif range_filter == 'HSV':
                 frame_to_thresh = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+            else:
+                frame_to_thresh = color.rgb2lab(image)
 
         v1_min, v2_min, v3_min, v1_max, v2_max, v3_max = get_trackbar_values(range_filter)
-
+## add LAB options here!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         thresh = cv2.inRange(frame_to_thresh, (v1_min, v2_min, v3_min), (v1_max, v2_max, v3_max))
 
         kernel = np.ones((5, 5), np.uint8)
@@ -76,27 +80,31 @@ def main():
         # (x, y) center of the ball
         cnts = cv2.findContours(mask.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[-2]
         center = None
+        print ('contours: ',cnts)
 
         # only proceed if at least one contour was found
         if len(cnts) > 0:
             # find the largest contour in the mask, then use
             # it to compute the minimum enclosing circle and
             # centroid
-            c = max(cnts, key=cv2.contourArea)
-            ((x, y), radius) = cv2.minEnclosingCircle(c)
-            M = cv2.moments(c)
-            center = (int(M["m10"] / M["m00"]), int(M["m01"] / M["m00"]))
+            # c = max(cnts, key=cv2.contourArea)
+            for c in cnts:
+                ((x, y), radius) = cv2.minEnclosingCircle(c)
+                M = cv2.moments(c)
+                center = (int(M["m10"] / M["m00"]), int(M["m01"] / M["m00"]))
 
-            # only proceed if the radius meets a minimum size
-            if radius > 10:
-                # draw the circle and centroid on the frame,
-                # then update the list of tracked points
-                cv2.circle(image, (int(x), int(y)), int(radius), (0, 255, 255), 2)
-                cv2.circle(image, center, 3, (0, 0, 255), -1)
-                cv2.putText(image, "centroid", (center[0] + 10, center[1]), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 0, 255),
-                            1)
-                cv2.putText(image, "(" + str(center[0]) + "," + str(center[1]) + ")", (center[0] + 10, center[1] + 15),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 0, 255), 1)
+                # only proceed if the radius meets a minimum size
+                if radius > 15:
+                    # draw the circle and centroid on the frame,
+                    # then update the list of tracked points
+                    cv2.circle(image, (int(x), int(y)), int(radius), (0, 255, 255), 2)
+                    cv2.circle(image, center, 3, (0, 0, 255), -1)
+                    cv2.putText(image, "centroid", (center[0] + 10, center[1]), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 0, 255),
+                                1)
+                    cv2.putText(image, "(" + str(center[0]) + "," + str(center[1]) + ")", (center[0] + 10, center[1] + 15),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 0, 255), 1)
+                    cv2.putText(image, "radius = "+ str(radius), (center[0] + 10, center[1]+40), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 0, 255),
+                                1)
 
         # show the frame to our screen
         cv2.imshow("Original", image)
